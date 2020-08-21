@@ -12,6 +12,8 @@ import torch
 from espnet.nets.pytorch_backend.conformer.convolution import ConvolutionModule
 from espnet.nets.pytorch_backend.conformer.encoder_layer import EncoderLayer
 from espnet.nets.pytorch_backend.conformer.subsampling import Conv2dSubsampling
+from espnet.nets.pytorch_backend.conformer.subsampling import Conv2dSubsampling6
+from espnet.nets.pytorch_backend.conformer.subsampling import Conv2dSubsampling8
 from espnet.nets.pytorch_backend.transducer.vgg import VGG2L
 from espnet.nets.pytorch_backend.transformer.attention import (
     MultiHeadedAttention,  # noqa: H301
@@ -192,7 +194,10 @@ class Encoder(torch.nn.Module):
         :return: position embedded tensor and mask
         :rtype Tuple[torch.Tensor, torch.Tensor]:
         """
-        if isinstance(self.embed, (Conv2dSubsampling, VGG2L)):
+        if isinstance(
+            self.embed,
+            (Conv2dSubsampling, Conv2dSubsampling6, Conv2dSubsampling8, VGG2L),
+        ):
             xs, masks = self.embed(xs, masks)
         else:
             xs = self.embed(xs)
