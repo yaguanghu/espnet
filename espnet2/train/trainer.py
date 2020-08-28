@@ -444,11 +444,12 @@ class Trainer:
                             scaler.step(optimizer)
                             # Updates the scale for next iteration.
                             scaler.update()
-                        else:
-                            optimizer.step()
-                    if isinstance(scheduler, AbsBatchStepScheduler):
+                        # else:
+                        # optimizer.step()
+                    # if isinstance(scheduler, AbsBatchStepScheduler):
                         scheduler.step()
-                optimizer.zero_grad()
+                # optimizer.zero_grad()
+                scheduler.zero_grad()
 
                 # Register lr and train/load time[sec/step],
                 # where step refers to accum_grad * mini-batch

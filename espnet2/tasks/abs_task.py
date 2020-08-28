@@ -41,6 +41,7 @@ from espnet2.samplers.build_batch_sampler import build_batch_sampler
 from espnet2.samplers.unsorted_batch_sampler import UnsortedBatchSampler
 from espnet2.schedulers.abs_scheduler import AbsScheduler
 from espnet2.schedulers.noam_lr import NoamLR
+from espnet2.schedulers.noam_lr2 import NoamLR2
 from espnet2.schedulers.warmup_lr import WarmupLR
 from espnet2.torch_utils.load_pretrained_model import load_pretrained_model
 from espnet2.torch_utils.model_summary import model_summary
@@ -145,7 +146,7 @@ scheduler_classes = dict(
 )
 if LooseVersion(torch.__version__) >= LooseVersion("1.1.0"):
     scheduler_classes.update(
-        noamlr=NoamLR, warmuplr=WarmupLR,
+        noamlr=NoamLR, warmuplr=WarmupLR, noamlr2=NoamLR2,
     )
 if LooseVersion(torch.__version__) >= LooseVersion("1.3.0"):
     CosineAnnealingWarmRestarts = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
