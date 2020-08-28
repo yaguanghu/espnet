@@ -6,11 +6,11 @@ import warnings
 
 def check(pytorch_version: str, cuda_version: str):
     # NOTE(kamo):  Supported cuda version is defined
-    # as existing prebuilt binaries existing in
+    # as existing prebuilt binaries in
     # https://pytorch.org/get-started/previous-versions/
     # You probably could perform pytorch with the cuda-version
-    # if you built pytorch manually.
-
+    # if you built pytorch at local.
+    maybe_supported = []
     # 1.6.0
     if LooseVersion("1.7") > LooseVersion(pytorch_version) >= LooseVersion("1.6"):
         supported = ["10.2", "10.1", "9.2"]
