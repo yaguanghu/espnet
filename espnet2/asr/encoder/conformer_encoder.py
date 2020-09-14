@@ -11,9 +11,11 @@ from typeguard import check_argument_types
 
 from espnet.nets.pytorch_backend.conformer.convolution import ConvolutionModule
 from espnet.nets.pytorch_backend.conformer.encoder_layer import EncoderLayer
-from espnet.nets.pytorch_backend.conformer.subsampling import Conv2dSubsampling
-from espnet.nets.pytorch_backend.conformer.subsampling import Conv2dSubsampling6
-from espnet.nets.pytorch_backend.conformer.subsampling import Conv2dSubsampling8
+from espnet.nets.pytorch_backend.transformer.subsampling import (
+    Conv2dSubsampling,  # noqa: H301
+    Conv2dSubsampling6,  # noqa: H301
+    Conv2dSubsampling8,  # noqa: H301
+)
 from espnet.nets.pytorch_backend.nets_utils import make_pad_mask
 from espnet.nets.pytorch_backend.transformer.attention import (
     MultiHeadedAttention,  # noqa: H301
@@ -108,18 +110,21 @@ class ConformerEncoder(AbsEncoder):
             self.embed = Conv2dSubsampling(
                 input_size,
                 output_size,
+                dropout_rate,
                 pos_enc_class(output_size, positional_dropout_rate),
             )
         elif input_layer == "conv2d6":
             self.embed = Conv2dSubsampling6(
                 input_size,
                 output_size,
+                dropout_rate,
                 pos_enc_class(output_size, positional_dropout_rate),
             )
         elif input_layer == "conv2d8":
             self.embed = Conv2dSubsampling8(
                 input_size,
                 output_size,
+                dropout_rate,
                 pos_enc_class(output_size, positional_dropout_rate),
             )
         elif input_layer == "embed":
