@@ -12,6 +12,7 @@ nj=1
 verbose=0
 compress=true
 write_utt2num_frames=true
+apply_cmvn=false
 filetype='mat'  # mat or hdf5
 help_message="Usage: $0 <scp> <cmvnark> <logdir> <dumpdir>"
 
@@ -63,12 +64,18 @@ if ${do_delta}; then
             --compress=${compress} --compression-method=2 ${write_num_frames_opt} \
             ark:- ark,scp:${dumpdir}/feats.JOB.ark,${dumpdir}/feats.JOB.scp \
         || exit 1
-else
+elif ${apply_cmvn}; then
     ${cmd} JOB=1:${nj} ${logdir}/dump_feature.JOB.log \
         apply-cmvn --norm-vars=true ${cvmnark} scp:${logdir}/feats.JOB.scp ark:- \| \
         copy-feats.py --verbose ${verbose} --out-filetype ${filetype} \
             --compress=${compress} --compression-method=2 ${write_num_frames_opt} \
             ark:- ark,scp:${dumpdir}/feats.JOB.ark,${dumpdir}/feats.JOB.scp \
+        || exit 1
+else
+    ${cmd} JOB=1:${nj} ${logdir}/dump_feature.JOB.log \
+        copy-feats.py --verbose ${verbose} --out-filetype ${filetype} \
+            --compress=${compress} --compression-method=2 ${write_num_frames_opt} \
+            scp:${logdir}/feats.JOB.scp ark,scp:${dumpdir}/feats.JOB.ark,${dumpdir}/feats.JOB.scp \
         || exit 1
 fi
 

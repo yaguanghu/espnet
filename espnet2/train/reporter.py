@@ -213,7 +213,7 @@ class SubReporter:
             v = aggregate(values)
             if abs(v) > 1.0e3:
                 message += f"{key2}={v:.3e}"
-            elif abs(v) > 1.0e-3:
+            elif abs(v) > 1.0e-1:
                 message += f"{key2}={v:.3f}"
             else:
                 message += f"{key2}={v:.3e}"
@@ -417,7 +417,7 @@ class Reporter:
                     if isinstance(v, float):
                         if abs(v) > 1.0e3:
                             _message += f"{key2}={v:.3e}"
-                        elif abs(v) > 1.0e-3:
+                        elif abs(v) > 1.0e-1:
                             _message += f"{key2}={v:.3f}"
                         else:
                             _message += f"{key2}={v:.3e}"

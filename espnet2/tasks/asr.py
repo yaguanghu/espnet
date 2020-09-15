@@ -40,6 +40,7 @@ from espnet2.utils.nested_dict_action import NestedDictAction
 from espnet2.utils.types import int_or_none
 from espnet2.utils.types import str2bool
 from espnet2.utils.types import str_or_none
+from espnet2.torch_utils.load_pretrained_model import load_pretrained_modules
 
 frontend_choices = ClassChoices(
     name="frontend",
@@ -166,7 +167,8 @@ class ASRTask(AbsTask):
             type=str,
             default="bpe",
             choices=["bpe", "char", "word", "phn"],
-            help="The text will be tokenized " "in the specified level token",
+            help="The text will be tokenized "
+            "in the specified level token",
         )
         group.add_argument(
             "--bpemodel",
@@ -174,6 +176,7 @@ class ASRTask(AbsTask):
             default=None,
             help="The model file of sentencepiece",
         )
+
         parser.add_argument(
             "--non_linguistic_symbols",
             type=str_or_none,
@@ -193,19 +196,49 @@ class ASRTask(AbsTask):
             default=None,
             help="Specify g2p method if --token_type=phn",
         )
-
+        group = parser.add_argument_group(description="Finetuning related")
+        # finetuning related
+        group.add_argument(
+            "--enc_init",
+            default=None,
+            type=str,
+            help="Pre-trained ASR model to initialize encoder.",
+        )
+        group.add_argument(
+            "--enc_init_mods",
+            default="enc.enc.",
+            type=lambda s: [str(mod) for mod in s.split(",") if s != ""],
+            help="List of encoder modules to initialize, separated by a comma.",
+        )
+        group.add_argument(
+            "--dec_init",
+            default=None,
+            type=str,
+            help="Pre-trained ASR, MT or LM model to initialize decoder.",
+        )
+        group.add_argument(
+            "--dec_init_mods",
+            default="att., dec.",
+            type=lambda s: [str(mod) for mod in s.split(",") if s != ""],
+            help="List of decoder modules to initialize, separated by a comma.",
+        )
+        group.add_argument(
+            "--freeze_mods",
+            default=None,
+            type=lambda s: [str(mod) for mod in s.split(",") if s != ""],
+            help="List of modules to freeze, separated by a comma.",
+        )
         for class_choices in cls.class_choices_list:
             # Append --<name> and --<name>_conf.
             # e.g. --encoder and --encoder_conf
             class_choices.add_arguments(group)
 
+
     @classmethod
     def build_collate_fn(
         cls, args: argparse.Namespace, train: bool
-    ) -> Callable[
-        [Collection[Tuple[str, Dict[str, np.ndarray]]]],
-        Tuple[List[str], Dict[str, torch.Tensor]],
-    ]:
+    ) -> Callable[[Collection[Tuple[str, Dict[str, np.ndarray]]]], Tuple[
+            List[str], Dict[str, torch.Tensor]],]:
         assert check_argument_types()
         # NOTE(kamo): int value = 0 is reserved by CTC-blank symbol
         return CommonCollateFn(float_pad_value=0.0, int_pad_value=-1)
@@ -231,9 +264,9 @@ class ASRTask(AbsTask):
         return retval
 
     @classmethod
-    def required_data_names(
-        cls, train: bool = True, inference: bool = False
-    ) -> Tuple[str, ...]:
+    def required_data_names(cls,
+                            train: bool = True,
+                            inference: bool = False) -> Tuple[str, ...]:
         if not inference:
             retval = ("speech", "text")
         else:
@@ -242,9 +275,9 @@ class ASRTask(AbsTask):
         return retval
 
     @classmethod
-    def optional_data_names(
-        cls, train: bool = True, inference: bool = False
-    ) -> Tuple[str, ...]:
+    def optional_data_names(cls,
+                            train: bool = True,
+                            inference: bool = False) -> Tuple[str, ...]:
         retval = ()
         assert check_return_type(retval)
         return retval
@@ -306,9 +339,9 @@ class ASRTask(AbsTask):
         )
 
         # 6. CTC
-        ctc = CTC(
-            odim=vocab_size, encoder_output_sizse=encoder.output_size(), **args.ctc_conf
-        )
+        ctc = CTC(odim=vocab_size,
+                  encoder_output_sizse=encoder.output_size(),
+                  **args.ctc_conf)
 
         # 7. RNN-T Decoder (Not implemented)
         rnnt_decoder = None
@@ -331,6 +364,17 @@ class ASRTask(AbsTask):
         # 9. Initialize
         if args.init is not None:
             initialize(model, args.init)
+        logging.info(f"ngpus: {args.ngpu}")
+        if args.enc_init or args.dec_init:
+            load_pretrained_modules(
+                model=model,
+                enc_model_path=args.enc_init,
+                dec_model_path=args.dec_init,
+                enc_modules=args.enc_init_mods,
+                dec_modules=args.dec_init_mods,
+                map_location=f"cuda:{torch.cuda.current_device()}"
+                if args.ngpu > 0 else "cpu",
+            )
 
         assert check_return_type(model)
         return model
