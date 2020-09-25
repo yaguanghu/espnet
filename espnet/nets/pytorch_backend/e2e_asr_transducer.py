@@ -22,6 +22,7 @@ from espnet.nets.pytorch_backend.transducer.transformer_decoder import Decoder
 from espnet.nets.pytorch_backend.transducer.utils import prepare_loss_inputs
 from espnet.nets.pytorch_backend.transformer.attention import MultiHeadedAttention
 from espnet.nets.pytorch_backend.transformer.encoder import Encoder
+from espnet.nets.pytorch_backend.conformer.encoder import ConformerEncoder
 from espnet.nets.pytorch_backend.transformer.mask import target_mask
 from espnet.utils.fill_missing_args import fill_missing_args
 
@@ -65,6 +66,7 @@ class E2E(ASRInterface, torch.nn.Module):
             type=str,
             choices=[
                 "transformer",
+                "conformer",
                 "lstm",
                 "blstm",
                 "lstmp",
@@ -183,7 +185,7 @@ class E2E(ASRInterface, torch.nn.Module):
             "--dtype",
             default="lstm",
             type=str,
-            choices=["lstm", "gru", "transformer"],
+            choices=["lstm", "gru", "transformer", "conformer"],
             help="Type of decoder to use.",
         )
         group.add_argument(
@@ -280,6 +282,40 @@ class E2E(ASRInterface, torch.nn.Module):
             help="Normalize transducer scores by length",
         )
 
+        group.add_argument(
+            "--transformer-encoder-pos-enc-layer-type",
+            type=str,
+            default="abs_pos",
+            choices=["abs_pos", "scaled_abs_pos", "rel_pos"],
+            help="transformer encoder positional encoding layer type",
+        )
+        group.add_argument(
+            "--transformer-encoder-activation-type",
+            type=str,
+            default="swish",
+            choices=["relu", "hardtanh", "selu", "swish"],
+            help="transformer encoder activation function type",
+        )
+        group.add_argument(
+            "--macaron-style",
+            default=False,
+            type=strtobool,
+            help="Whether to use macaron style for positionwise layer",
+        )
+        # CNN module
+        group.add_argument(
+            "--use-cnn-module",
+            default=False,
+            type=strtobool,
+            help="Use convolution module or not",
+        )
+        group.add_argument(
+            "--cnn-module-kernel",
+            default=31,
+            type=int,
+            help="Kernel size of convolution module.",
+        )
+
         return parser
 
     def __init__(self, idim, odim, args, ignore_id=-1, blank_id=0):
@@ -309,6 +345,27 @@ class E2E(ASRInterface, torch.nn.Module):
                 dropout_rate=args.dropout_rate,
                 positional_dropout_rate=args.dropout_rate,
                 attention_dropout_rate=args.transformer_attn_dropout_rate_encoder,
+            )
+        elif args.etype == "conformer":
+            if args.transformer_attn_dropout_rate is None:
+                args.transformer_attn_dropout_rate = args.dropout_rate
+            self.subsample = get_subsample(args, mode="asr", arch="rnn-t")
+            self.encoder = Encoder(
+                idim=idim,
+                attention_dim=args.adim,
+                attention_heads=args.aheads,
+                linear_units=args.eunits,
+                num_blocks=args.elayers,
+                input_layer=args.transformer_input_layer,
+                dropout_rate=args.dropout_rate,
+                positional_dropout_rate=args.dropout_rate,
+                attention_dropout_rate=args.transformer_attn_dropout_rate_encoder,
+                pos_enc_layer_type=args.transformer_encoder_pos_enc_layer_type,
+                selfattention_layer_type=args.transformer_encoder_selfattn_layer_type,
+                activation_type=args.transformer_encoder_activation_type,
+                macaron_style=args.macaron_style,
+                use_cnn_module=args.use_cnn_module,
+                cnn_module_kernel=args.cnn_module_kernel,
             )
         else:
             self.subsample = get_subsample(args, mode="asr", arch="rnn-t")
