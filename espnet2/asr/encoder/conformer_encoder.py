@@ -1,21 +1,17 @@
-# Copyright 2019 Shigeki Karita
+# Copyright 2020 Tomoki Hayashi
 #  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
+"""Conformer encoder definition."""
 
-"""Encoder definition."""
 from typing import Optional
 from typing import Tuple
 
 import torch
-from typeguard import check_argument_types
 
+from typeguard import check_argument_types
 
 from espnet.nets.pytorch_backend.conformer.convolution import ConvolutionModule
 from espnet.nets.pytorch_backend.conformer.encoder_layer import EncoderLayer
-from espnet.nets.pytorch_backend.transformer.subsampling import (
-    Conv2dSubsampling,  # noqa: H301
-    Conv2dSubsampling6,  # noqa: H301
-    Conv2dSubsampling8,  # noqa: H301
-)
+from espnet.nets.pytorch_backend.nets_utils import get_activation
 from espnet.nets.pytorch_backend.nets_utils import make_pad_mask
 from espnet.nets.pytorch_backend.transformer.attention import (
     MultiHeadedAttention,  # noqa: H301
@@ -33,6 +29,9 @@ from espnet.nets.pytorch_backend.transformer.positionwise_feed_forward import (
     PositionwiseFeedForward,  # noqa: H301
 )
 from espnet.nets.pytorch_backend.transformer.repeat import repeat
+from espnet.nets.pytorch_backend.transformer.subsampling import Conv2dSubsampling
+from espnet.nets.pytorch_backend.transformer.subsampling import Conv2dSubsampling6
+from espnet.nets.pytorch_backend.transformer.subsampling import Conv2dSubsampling8
 from espnet2.asr.encoder.abs_encoder import AbsEncoder
 
 
@@ -40,25 +39,30 @@ class ConformerEncoder(AbsEncoder):
     """Conformer encoder module.
 
     Args:
-        input_size: input dim
-        output_size: dimension of attention
-        attention_heads: the number of heads of multi head attention
-        linear_units: the number of units of position-wise feed forward
-        num_blocks: the number of decoder blocks
-        dropout_rate: dropout rate
-        attention_dropout_rate: dropout rate in attention
-        positional_dropout_rate: dropout rate after adding positional encoding
-        input_layer: input layer type
-        pos_enc_class: PositionalEncoding or ScaledPositionalEncoding
-        normalize_before: whether to use layer_norm before the first block
-        concat_after: whether to concat attention layer's input and output
-            if True, additional linear will be applied.
+        input_size (int): Input dimension.
+        output_size (int): Dimention of attention.
+        attention_heads (int): The number of heads of multi head attention.
+        linear_units (int): The number of units of position-wise feed forward.
+        num_blocks (int): The number of decoder blocks.
+        dropout_rate (float): Dropout rate.
+        attention_dropout_rate (float): Dropout rate in attention.
+        positional_dropout_rate (float): Dropout rate after adding positional encoding.
+        input_layer (Union[str, torch.nn.Module]): Input layer type.
+        normalize_before (bool): Whether to use layer_norm before the first block.
+        concat_after (bool): Whether to concat attention layer's input and output.
+            If True, additional linear will be applied.
             i.e. x -> x + linear(concat(x, att(x)))
-            if False, no additional linear will be applied.
-            i.e. x -> x + att(x)
-        positionwise_layer_type: linear of conv1d
-        positionwise_conv_kernel_size: kernel size of positionwise conv1d layer
-        padding_idx: padding_idx for input_layer=embed
+            If False, no additional linear will be applied. i.e. x -> x + att(x)
+        positionwise_layer_type (str): "linear", "conv1d", or "conv1d-linear".
+        positionwise_conv_kernel_size (int): Kernel size of positionwise conv1d layer.
+        encoder_pos_enc_layer_type (str): Encoder positional encoding layer type.
+        encoder_attn_layer_type (str): Encoder attention layer type.
+        activation_type (str): Encoder activation function type.
+        macaron_style (bool): Whether to use macaron style for positionwise layer.
+        use_cnn_module (bool): Whether to use convolution module.
+        cnn_module_kernel (int): Kernerl size of convolution module.
+        padding_idx (int): Padding idx for input_layer=embed.
+
     """
 
     def __init__(
@@ -71,23 +75,24 @@ class ConformerEncoder(AbsEncoder):
         dropout_rate: float = 0.1,
         positional_dropout_rate: float = 0.1,
         attention_dropout_rate: float = 0.0,
-        input_layer: Optional[str] = "conv2d",
+        input_layer: str = "conv2d",
         normalize_before: bool = True,
         concat_after: bool = False,
         positionwise_layer_type: str = "linear",
-        positionwise_conv_kernel_size: int = 1,
-        padding_idx: int = -1,
-        # conformer specific
+        positionwise_conv_kernel_size: int = 3,
         macaron_style: bool = False,
-        pos_enc_layer_type: str = "abs_pos",
-        selfattention_layer_type: str = "selfattn",
-        use_cnn_module: bool = False,
+        pos_enc_layer_type: str = "rel_pos",
+        selfattention_layer_type: str = "rel_selfattn",
+        activation_type: str = "swish",
+        use_cnn_module: bool = True,
         cnn_module_kernel: int = 31,
+        padding_idx: int = -1,
     ):
         assert check_argument_types()
         super().__init__()
         self._output_size = output_size
 
+        activation = get_activation(activation_type)
         if pos_enc_layer_type == "abs_pos":
             pos_enc_class = PositionalEncoding
         elif pos_enc_layer_type == "scaled_abs_pos":
@@ -103,7 +108,6 @@ class ConformerEncoder(AbsEncoder):
                 torch.nn.Linear(input_size, output_size),
                 torch.nn.LayerNorm(output_size),
                 torch.nn.Dropout(dropout_rate),
-                torch.nn.ReLU(),
                 pos_enc_class(output_size, positional_dropout_rate),
             )
         elif input_layer == "conv2d":
@@ -129,13 +133,19 @@ class ConformerEncoder(AbsEncoder):
             )
         elif input_layer == "embed":
             self.embed = torch.nn.Sequential(
-                torch.nn.Embedding(input_size, output_size, padding_idx=padding_idx),
+                torch.nn.Embedding(input_size,
+                                   output_size,
+                                   padding_idx=padding_idx),
+                pos_enc_class(output_size, positional_dropout_rate),
+            )
+        elif isinstance(input_layer, torch.nn.Module):
+            self.embed = torch.nn.Sequential(
+                input_layer,
                 pos_enc_class(output_size, positional_dropout_rate),
             )
         elif input_layer is None:
             self.embed = torch.nn.Sequential(
-                pos_enc_class(output_size, positional_dropout_rate)
-            )
+                pos_enc_class(output_size, positional_dropout_rate))
         else:
             raise ValueError("unknown input_layer: " + input_layer)
         self.normalize_before = normalize_before
@@ -145,6 +155,7 @@ class ConformerEncoder(AbsEncoder):
                 output_size,
                 linear_units,
                 dropout_rate,
+                activation,
             )
         elif positionwise_layer_type == "conv1d":
             positionwise_layer = MultiLayeredConv1d
@@ -181,10 +192,11 @@ class ConformerEncoder(AbsEncoder):
                 attention_dropout_rate,
             )
         else:
-            raise ValueError("unknown encoder_attn_layer: " + selfattention_layer_type)
+            raise ValueError("unknown encoder_attn_layer: " +
+                             selfattention_layer_type)
 
         convolution_layer = ConvolutionModule
-        convolution_layer_args = (output_size, cnn_module_kernel)
+        convolution_layer_args = (output_size, cnn_module_kernel, activation)
 
         self.encoders = repeat(
             num_blocks,
@@ -192,8 +204,10 @@ class ConformerEncoder(AbsEncoder):
                 output_size,
                 encoder_selfattn_layer(*encoder_selfattn_layer_args),
                 positionwise_layer(*positionwise_layer_args),
-                positionwise_layer(*positionwise_layer_args) if macaron_style else None,
-                convolution_layer(*convolution_layer_args) if use_cnn_module else None,
+                positionwise_layer(*positionwise_layer_args)
+                if macaron_style else None,
+                convolution_layer(*convolution_layer_args)
+                if use_cnn_module else None,
                 dropout_rate,
                 normalize_before,
                 concat_after,
@@ -211,22 +225,24 @@ class ConformerEncoder(AbsEncoder):
         ilens: torch.Tensor,
         prev_states: torch.Tensor = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        """Embed positions in tensor.
+        """Calculate forward propagation.
 
         Args:
-            xs_pad: input tensor (B, L, D)
-            ilens: input length (B)
-            prev_states: Not to be used now.
+            xs_pad (torch.Tensor): Input tensor (#batch, L, input_size).
+            ilens (torch.Tensor): Input length (#batch).
+            prev_states (torch.Tensor): Not to be used now.
+
         Returns:
-            position embedded tensor and mask
+            torch.Tensor: Output tensor (#batch, L, output_size).
+            torch.Tensor: Output length (#batch).
+            torch.Tensor: Not to be used now.
+
         """
         masks = (~make_pad_mask(ilens)[:, None, :]).to(xs_pad.device)
 
-        if (
-            isinstance(self.embed, Conv2dSubsampling)
-            or isinstance(self.embed, Conv2dSubsampling6)
-            or isinstance(self.embed, Conv2dSubsampling8)
-        ):
+        if (isinstance(self.embed, Conv2dSubsampling) or
+                isinstance(self.embed, Conv2dSubsampling6) or
+                isinstance(self.embed, Conv2dSubsampling8)):
             xs_pad, masks = self.embed(xs_pad, masks)
         else:
             xs_pad = self.embed(xs_pad)

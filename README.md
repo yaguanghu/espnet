@@ -53,8 +53,9 @@ and also follows [Kaldi](http://kaldi-asr.org/) style data processing, feature e
 - Incorporate RNNLM/LSTMLM/TransformerLM/N-gram trained only with text data
 - Batch GPU decoding
 - **Transducer** based end-to-end ASR
-  - Available: RNN-Transducer, Transformer-Transducer, mixed Transformer/RNN-Transducer
-  - Also support: attention mechanism (RNN-decoder), pre-init w/ LM (RNN-decoder), VGG-Transformer (encoder)
+  - Available: RNN-based encoder/decoder and Transformer-based encoder/decoder w/ customizable architecture.
+  - Also support: mixed RNN/Transformer architecture, attention mechanism (RNN decoder), VGG2L (RNN/Transformer encoder), Conformer (Transformer encoder), TDNN (Transformer encoder), Causal Conv1d (Transformer decoder) and various decoding algorithms.
+  > Please refer to the [tutorial page](https://espnet.github.io/espnet/tutorial.html#transducer) for complete documentation.
 - CTC segmentation
 
 ### TTS: Text-to-speech
@@ -156,10 +157,10 @@ We list the character error rate (CER) and word error rate (WER) of major ASR ta
 | CSJ eval2              | 3.8     | N/A     | same as above                                                                                                                                                         |
 | CSJ eval3              | 4.2     | N/A     | same as above                                                                                                                                                         |
 | HKUST dev              | 23.5    | N/A     | [link](https://github.com/espnet/espnet/blob/master/egs/hkust/asr1/RESULTS.md#transformer-only-20-epochs)                                                             |
-| Librispeech dev_clean  | N/A     | 2.1     | [link](https://github.com/espnet/espnet/blob/master/egs/librispeech/asr1/RESULTS.md#pytorch-large-transformer-with-specaug-4-gpus--transformer-lm-4-gpus)             |
-| Librispeech dev_other  | N/A     | 5.3     | same as above                                                                                                                                                         |
-| Librispeech test_clean | N/A     | 2.5     | same as above                                                                                                                                                         |
-| Librispeech test_other | N/A     | 5.5     | same as above                                                                                                                                                         |
+| Librispeech dev_clean  | N/A     | 2.0     | [link](https://github.com/espnet/espnet/blob/master/egs/librispeech/asr1/RESULTS.md#pytorch-large-transformer-with-specaug-4-gpus--transformer-lm-4-gpus)             |
+| Librispeech dev_other  | N/A     | 4.9     | same as above                                                                                                                                                         |
+| Librispeech test_clean | N/A     | 2.2     | same as above                                                                                                                                                         |
+| Librispeech test_other | N/A     | 5.3     | same as above                                                                                                                                                         |
 | TEDLIUM2 dev           | N/A     | 9.3     | [link](https://github.com/espnet/espnet/blob/master/egs/tedlium2/asr1/RESULTS.md#transformer-large-model--specaug--large-lm)                                          |
 | TEDLIUM2 test          | N/A     | 8.1     | same as above                                                                                                                                                         |
 | TEDLIUM3 dev           | N/A     | 9.7     | [link](https://github.com/espnet/espnet/blob/master/egs/tedlium3/asr1/RESULTS.md#transformer-elayers12-dlayers6-units2048-8-gpus-specaug--large-lm)                   |

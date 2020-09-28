@@ -78,6 +78,7 @@ normalize_choices = ClassChoices(
 encoder_choices = ClassChoices(
     "encoder",
     classes=dict(
+        conformer=ConformerEncoder,
         transformer=TransformerEncoder,
         conformer=ConformerEncoder,
         vgg_rnn=VGGRNNEncoder,
